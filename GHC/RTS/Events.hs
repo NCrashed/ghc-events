@@ -39,6 +39,7 @@ module GHC.RTS.Events (
 
        -- * Functions that assist reading and writing event logs
        putEvent,
+       putEventType,
        PutEvents,
        putEventLog,
 
@@ -1050,16 +1051,17 @@ putHeader (Header ets) = do
     mapM_ putEventType ets
     putMarker EVENT_HET_END
     putMarker EVENT_HEADER_END
- where
-    putEventType (EventType n d msz) = do
-        putMarker EVENT_ET_BEGIN
-        putType n
-        putE $ fromMaybe 0xffff msz
-        putE (fromIntegral $ length d :: EventTypeDescLen)
-        mapM_ put d
-        -- the event type header allows for extra data, which we don't use:
-        putE (0 :: Word32)
-        putMarker EVENT_ET_END
+
+putEventType :: EventType -> PutEvents ()
+putEventType (EventType n d msz) = do
+    putMarker EVENT_ET_BEGIN
+    putType n
+    putE $ fromMaybe 0xffff msz
+    putE (fromIntegral $ length d :: EventTypeDescLen)
+    mapM_ put d
+    -- the event type header allows for extra data, which we don't use:
+    putE (0 :: Word32)
+    putMarker EVENT_ET_END
 
 putData :: Data -> PutEvents ()
 putData (Data es) = do
