@@ -38,6 +38,9 @@ module GHC.RTS.Events (
        MessageTag(..),
 
        -- * Functions that assist reading and writing event logs
+       putHeader,
+       putDataBeginMarker,
+       putDataEndMarker,
        putEvent,
        putEventType,
        PutEvents,
@@ -1043,6 +1046,12 @@ putEventLog :: EventLog -> PutEvents ()
 putEventLog (EventLog hdr es) = do
     putHeader hdr
     putData es
+
+putDataBeginMarker :: PutEvents ()
+putDataBeginMarker = putMarker EVENT_DATA_BEGIN
+
+putDataEndMarker :: PutEvents ()
+putDataEndMarker = putMarker EVENT_DATA_END
 
 putHeader :: Header -> PutEvents ()
 putHeader (Header ets) = do
