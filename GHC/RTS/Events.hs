@@ -138,8 +138,8 @@ getEvent (EventParsers parsers) = do
   if etRef == EVENT_DATA_END
      then return Nothing
      else do !ts   <- get
-             spec <- parsers ! fromIntegral etRef
-             return $ Just (Event ts spec undefined)
+             spc <- parsers ! fromIntegral etRef
+             return $ Just (Event ts spc undefined)
 
 --
 -- standardEventParsers.
@@ -586,7 +586,7 @@ ghc6Parsers = [
 -- Parsers for parallel events. Parameter is the thread_id size, to create
 -- ghc6-parsers (using the wrong size) where necessary.
 parRTSParsers :: EventTypeSize -> [EventParser EventInfo]
-parRTSParsers sz_tid = [
+parRTSParsers sz_tid' = [
  (VariableSizeParser EVENT_VERSION (do -- (version)
       num <- get :: Get Word16
       string <- getString num
@@ -612,7 +612,7 @@ parRTSParsers sz_tid = [
         return KillProcess{ process = p })
  ),
 
- (FixedSizeParser EVENT_ASSIGN_THREAD_TO_PROCESS (sz_tid + sz_procid)
+ (FixedSizeParser EVENT_ASSIGN_THREAD_TO_PROCESS (sz_tid' + sz_procid)
     (do t <- get
         p <- get
         return AssignThreadToProcess { thread = t, process = p })
@@ -630,7 +630,7 @@ parRTSParsers sz_tid = [
  ),
 
  (FixedSizeParser EVENT_SEND_MESSAGE
-    (sz_msgtag + 2*sz_procid + 2*sz_tid + sz_mid)
+    (sz_msgtag + 2*sz_procid + 2*sz_tid' + sz_mid)
     (do tag <- get :: Get RawMsgTag
         sP  <- get :: Get ProcessId
         sT  <- get :: Get ThreadId
@@ -647,7 +647,7 @@ parRTSParsers sz_tid = [
  ),
 
  (FixedSizeParser EVENT_RECEIVE_MESSAGE
-    (sz_msgtag + 2*sz_procid + 2*sz_tid + sz_mid + sz_mes)
+    (sz_msgtag + 2*sz_procid + 2*sz_tid' + sz_mid + sz_mes)
     (do tag <- get :: Get Word8
         rP  <- get :: Get ProcessId
         rIP <- get :: Get PortId
@@ -666,7 +666,7 @@ parRTSParsers sz_tid = [
  ),
 
  (FixedSizeParser EVENT_SEND_RECEIVE_LOCAL_MESSAGE
-    (sz_msgtag + 2*sz_procid + 2*sz_tid)
+    (sz_msgtag + 2*sz_procid + 2*sz_tid')
     (do tag <- get :: Get Word8
         sP  <- get :: Get ProcessId
         sT  <- get :: Get ThreadId
@@ -776,8 +776,8 @@ buildEventTypeMap etypes = M.fromList [ (fromIntegral (num t),t) | t <- etypes ]
 -- Some pretty-printing support
 
 showEventInfo :: EventInfo -> String
-showEventInfo spec =
-    case spec of
+showEventInfo spc =
+    case spc of
         EventBlock end_time cap _block_events ->
           printf "event block: cap %d, end time: %d\n" cap end_time
         Startup n_caps ->
@@ -999,28 +999,28 @@ ppEventType (EventType num dsc msz) = printf "%4d: %s (size %s)" num dsc
 
 -- | Pretty prints an 'Event', with clean handling for 'UnknownEvent'
 ppEvent :: IntMap EventType -> Event -> String
-ppEvent imap (Event {evTime = time, evSpec = spec, evCap = cap}) =
-  printf "%9d: " time ++
+ppEvent imap (Event {evTime = t, evSpec = spc, evCap = cap}) =
+  printf "%9d: " t ++
   (case cap of
     Nothing -> ""
     Just c  -> printf "cap %d: " c) ++
-  case spec of
+  case spc of
     UnknownEvent{ ref=ref } ->
       printf (desc (fromJust (M.lookup (fromIntegral ref) imap)))
-    _ -> showEventInfo spec
+    _ -> showEventInfo spc
 
 -- | Pretty prints an 'Event'. Cannot identify 'UnknownEvent's but has a
 -- simple type signature
 ppEvent' :: Event -> String
-ppEvent' (Event time spec evCap) =
-  printf "%9d: " time ++
+ppEvent' (Event t spc evCap) =
+  printf "%9d: " t ++
   (case evCap of
     Nothing -> ""
     Just c  -> printf "cap %d: " c) ++
-  case spec of
+  case spc of
     UnknownEvent{ ref=ref } ->
       printf "Unknown Event (ref: %d)" ref
-    _ -> showEventInfo spec
+    _ -> showEventInfo spc
 type PutEvents a = PutM a
 
 putE :: Binary a => a -> PutEvents ()
@@ -1159,10 +1159,10 @@ nEVENT_PERF_COUNTER = EVENT_PERF_COUNTER
 nEVENT_PERF_TRACEPOINT = EVENT_PERF_TRACEPOINT
 
 putEvent :: Event -> PutEvents ()
-putEvent (Event {evTime = t , evSpec = spec}) = do
-    putType (eventTypeNum spec)
+putEvent (Event {evTime = t , evSpec = spc}) = do
+    putType (eventTypeNum spc)
     put t
-    putEventSpec spec
+    putEventSpec spc
 
 putEventSpec :: EventInfo -> PutEvents ()
 putEventSpec (Startup caps) = do
