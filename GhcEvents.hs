@@ -15,6 +15,7 @@ import Data.Either (rights)
 import qualified Data.Map as M
 import System.IO (IOMode(ReadMode), openBinaryFile)
 import System.Exit (die)
+import qualified Data.ByteString as BS 
 
 main :: IO ()
 main = getArgs >>= command
@@ -181,10 +182,19 @@ command _ = putStr usage >> die "Unrecognized command"
 
 readLogOrDie :: FilePath -> IO EventLog
 readLogOrDie file = do
-    e <- readEventLogFromFile file
-    case e of
-        Left s    -> die ("Failed to parse " ++ file ++ ": " ++ s)
-        Right evtLog -> return evtLog
+    cnt <- BS.readFile file 
+    let parser = newParserState `pushBytes` cnt 
+    case go False [] parser of 
+        Left s -> die $ "Failed to parse " ++ file ++ ": " ++ s
+        Right (es, parser') -> case readHeader parser' of 
+            Nothing -> die $ "Failed to parse " ++ file ++ ": missing header"
+            Just h -> return $ EventLog h (Data es)
+    where 
+    go !incomplete !acc !parser = let (res, parser') = readEvent parser in case res of 
+      Item a -> go False (a : acc) parser'
+      Incomplete -> if incomplete then Left "incomplete" else go True acc parser'
+      Complete -> Right (reverse acc, parser')
+      ParseError err -> Left err
 
 usage :: String
 usage = unlines $ map pad strings
