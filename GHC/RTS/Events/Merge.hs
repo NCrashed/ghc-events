@@ -3,7 +3,6 @@
 module GHC.RTS.Events.Merge (mergeEventLogs) where
 
 import GHC.RTS.Events
-import Data.Monoid
 import Data.List (foldl')
 import qualified Data.Map as M
 import Data.Word (Word32)

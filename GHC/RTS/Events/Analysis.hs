@@ -41,16 +41,6 @@ data Machine s i = Machine
   , delta   :: s -> i -> Maybe s -- ^ State transition function
   }
 
--- | This machine always accepts, never terminates, and always has unit state.
--- It is not used anywhere.
-unitMachine :: Machine () i
-unitMachine = Machine
-  { initial  = ()
-  , final    = const False
-  , alpha    = const True
-  , delta    = (\_ _ -> Just ())
-  }
-
 -- | The `step` function runs a machine in a state against a single input.
 -- The state remains fixed once a final state is encountered. The
 -- result is `Left state input` if some `state` failed for an `ìnput`, and
@@ -109,16 +99,16 @@ analyse machine extract is = go (initial machine) is
  where
   -- go :: s -> [i] -> Process (s, i) o
   go _ [] = Done
-  go s (i:is)
+  go s (i:is')
     | final machine s = Done
     | alpha machine i =
         case delta machine s i of
           Nothing -> Fail (s, i)
           Just s' ->
             case extract s i of
-              Nothing -> go s' is
-              Just o  -> Prod o (go s' is)
-    | otherwise = go s is
+              Nothing -> go s' is'
+              Just o  -> Prod o (go s' is')
+    | otherwise = go s is'
 
 -- | Machines sometimes need to operate on coarser input than they are defined
 -- for. This function takes a function that refines input and a machine that
@@ -147,8 +137,7 @@ data Profile s = Profile
   } deriving (Show)
 
 -- | This function takes a machine and profiles its state.
-profileM :: Ord s
-         => (i -> Timestamp)
+profileM :: (i -> Timestamp)
          -> Machine s i
          -> Machine (Profile s) i
 profileM timer machine = Machine
@@ -170,8 +159,7 @@ extractProfile :: (i -> Timestamp)                -- ^ Extracts current timestam
                -> Maybe (s, Timestamp, Timestamp) -- ^ (state, currentTime, elapsedTime)
 extractProfile timer p i = Just (profileState p, profileTime p, timer i - profileTime p)
 
-profile :: (Ord s, Eq s)
-        => Machine s i       -- ^ A machine to profile
+profile :: Machine s i       -- ^ A machine to profile
         -> (i -> Timestamp)  -- ^ Converts input to timestamps
         -> [i]               -- ^ The list of input
         -> Process (Profile s, i) (s, Timestamp, Timestamp)
@@ -179,7 +167,7 @@ profile machine timer =
   analyse (profileM timer machine)
           (extractProfile timer)
 
-profileIndexed :: (Ord k, Ord s, Eq s)
+profileIndexed :: Ord k
                => Machine s i
                -> (i -> Maybe k)
                -> (i -> Timestamp)
@@ -229,7 +217,7 @@ indexM index machine = Machine
     state' <- delta machine state i
     return $ M.insert k state' m
 
-profileRouted :: (Ord k, Ord s, Eq s, Eq r)
+profileRouted :: Ord k
               => Machine s i
               -> Machine r i
               -> (r -> i -> Maybe k)

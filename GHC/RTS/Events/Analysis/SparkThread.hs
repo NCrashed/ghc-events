@@ -90,9 +90,6 @@ capabilitySparkThreadMachine = Machine
       | S.notMember threadId s    = Just (m, s)  -- Not a spark thread
       | otherwise                 = Just (M.insert capId threadId m, S.insert threadId s)
 
-    stopThread :: ThreadId -> Maybe (Map Int ThreadId, Set ThreadId)
-    stopThread threadId = Just (M.filter (/= threadId) m, S.delete threadId s)
-
     pauseThread :: ThreadId -> Maybe (Map Int ThreadId, Set ThreadId)
     pauseThread threadId = Just (M.filter (/= threadId) m, s)
 
